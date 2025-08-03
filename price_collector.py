@@ -6,7 +6,7 @@ import time
 API_KEY = "PKFLXCKJJFL57Y9L20TQ"
 SECRET_KEY = "qEUwb5wyLkgJswK0STlg2lisDX9TBVGDIOlHTpSc"
 
-symbols = ["MSFT", "VRT", "NVDA", "PWR", "GEV", "ORCL", "CLS", "HOOD", "IONQ", "TSLA"]
+symbols = ["MSFT", "VRT", "NVDA", "PWR", "GEV", "ORCL", "HOOD", "IONQ", "TSLA"]
 
 headers = {
     "APCA-API-KEY-ID": API_KEY,
@@ -51,4 +51,6 @@ if __name__ == "__main__":
     print("⏳ 1분 단위 가격 수집 + Flask API 시작")
     t = threading.Thread(target=collect_prices, daemon=True)
     t.start()
-    app.run(host="0.0.0.0", port=8000)
+    import os
+    port = int(os.environ.get("PORT", 8000))  # Render 포트 환경 변수 사용
+    app.run(host="0.0.0.0", port=port)
