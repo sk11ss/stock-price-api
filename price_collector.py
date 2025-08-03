@@ -3,7 +3,53 @@ from flask import Flask, jsonify
 import threading
 import time
 
-symbols = ["MSFT", "VRT", "NVDA", "PWR", "GEV", "ORCL", "IONQ", "TSLA", "ASML", "AMD", "AVGO"]
+symbols = ["MSFT", "VRT", "NVDA", "PWR", "GEV", "ORCL", "IONQ", "TSLA", "ASML", "AMD", "AVGO", "SMCI"]
+
+# ✅ 매수표 템플릿 (고정)
+# 1열: 종목, 2열: 구분(분야), 3열: 현재가, 4열: 매수추천가, 5열: 괴리율, 6열: 보유, 7열: 추가, 8열: 비중
+BUY_TABLE_TEMPLATE = {
+    "columns": ["종목", "구분(분야)", "현재가", "매수추천가", "괴리율(%)", "보유", "추가", "비중"],
+    "description": "종목명은 예: MSFT (Azure/AI), 구분(분야)은 AI 섹터의 분야 표기, 보유/추가 주식수 포함"
+}
+
+# ✅ 매수표 기본 구조 (데이터 예시 없이 템플릿만)
+
+BUY_TABLE_DATA = [
+    {"구분": "", "종목": "", "현재가": 0.0, "매수추천가": 0.0, "괴리율(%)": 0.0, "보유": 0, "추가": 0, "비중": "0%"}
+    # ✅ 실제 데이터는 별도 로직에서 추가됨
+]
+
+# ✅ 심볼별 AI 섹터 구분
+SECTOR_MAP = {
+    "MSFT": "MSFT (Azure/AI)",
+    "ORCL": "ORCL (DB)",
+    "NVDA": "NVDA (GPU)",
+    "AMD": "AMD (CPU)",
+    "AVGO": "AVGO (Network)",      # AVGO → 반도체 장비로 간주
+    "SMCI": "SMCI (Server)",
+    "ASML": "ASML (EUV)",          # ASML → 반도체 장비로 간주
+    "PWR": "PWR (AI 전력)",         # 전력 → AI 전력
+    "VRT": "VRT (냉각)",
+    "GEV": "GEV (AI 전력)",         # 전력 → AI 전력
+    "IONQ": "IONQ (양자컴)",
+    "TSLA": "TSLA (로보틱스)"
+}
+
+# ✅ 현재 보유 주식 수
+CURRENT_HOLDINGS = {
+    "MSFT": 8,
+    "NVDA": 20,
+    "ORCL": 12,
+    "AVGO": 5,
+    "VRT": 18,
+    "PWR": 5,
+    "GEV": 4,
+    "SMCI": 26,
+    "IONQ": 115,
+    "ASML": 0,
+    "AMD": 0,
+    "TSLA": 0
+}
 
 def get_latest_price(symbol):
     try:
@@ -91,6 +137,24 @@ def batch_ema50():
         except Exception as e:
             results[sym] = None
     return jsonify(results)
+
+# ✅ 매수표 생성 endpoint
+@app.route("/buytable")
+def get_buy_table():
+    table = []
+    for sym in symbols:
+        entry = {
+            "종목": SECTOR_MAP.get(sym, sym),
+            "구분(분야)": SECTOR_MAP.get(sym, "").split("(")[-1].replace(")", ""),
+            "현재가": latest_prices.get(sym, None),
+            "매수추천가": None,  # 나중에 로직 추가
+            "괴리율(%)": None,    # 나중에 계산 추가
+            "보유": CURRENT_HOLDINGS.get(sym, 0),
+            "추가": 0,  # 나중에 계산 추가
+            "비중": "0%"  # 나중에 계산 추가
+        }
+        table.append(entry)
+    return jsonify({"columns": BUY_TABLE_TEMPLATE["columns"], "data": table})
 
 if __name__ == "__main__":
     print("⏳ 1분 단위 가격 수집 + Flask API 시작")
