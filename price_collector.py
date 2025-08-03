@@ -1,3 +1,25 @@
+import numpy as np
+import datetime
+
+# --- Anchored VWAP & Fib Retracement helper functions ---
+def calculate_anchored_vwap(prices, volumes):
+    """
+    ✅ Anchored VWAP: (가격 × 거래량) 합 / 거래량 합
+    - 단순 placeholder (최근 30일치 데이터로 가정)
+    - 향후 Investing.com 또는 TradingView 데이터로 교체 가능
+    """
+    if not prices or not volumes or len(prices) != len(volumes):
+        return None
+    return round(np.dot(prices, volumes) / np.sum(volumes), 2)
+
+def calculate_fib_retracement(high, low):
+    """
+    ✅ Fib Retracement 50~61.8% 눌림목 가격 범위
+    - 단순 placeholder: 50% 지점 반환
+    """
+    fib_50 = low + (high - low) * 0.5
+    fib_618 = low + (high - low) * 0.618
+    return round((fib_50 + fib_618) / 2, 2)
 from flask import Flask, jsonify
 import threading
 import time
@@ -5,10 +27,10 @@ import time
 symbols = ["MSFT", "VRT", "NVDA", "PWR", "GEV", "ORCL", "IONQ", "TSLA", "ASML", "AMD", "AVGO", "SMCI"]
 
 # ✅ 매수표 템플릿 (고정)
-# 1열: 구분(분야), 2열: 종목, 3열: 현재가, 4열: 매수추천가, 5열: 괴리율, 6열: 보유, 7열: 추가, 8열: 비중
+# 1열: 종목, 2열: 구분(분야), 3열: 현재가, 4열: 매수추천가, 5열: 괴리율, 6열: 보유, 7열: 추가, 8열: 비중
 BUY_TABLE_TEMPLATE = {
-    "columns": ["구분(분야)", "종목", "현재가", "매수추천가", "괴리율(%)", "보유", "추가", "비중"],
-    "description": "구분(분야) → AI 섹터 분야, 종목명은 예: MSFT (Azure/AI)"
+    "columns": ["종목", "구분(분야)", "현재가", "매수추천가", "괴리율(%)", "보유", "추가", "비중"],
+    "description": "종목명은 예: MSFT (Azure/AI), 구분(분야)은 AI 섹터의 분야 표기, 보유/추가 주식수 포함"
 }
 
 # ✅ 매수표 기본 구조 (데이터 예시 없이 템플릿만)
@@ -153,19 +175,35 @@ def get_external_price(symbol):
 @app.route("/buytable")
 def get_buy_table():
     equal_weight = round(100 / len(symbols), 1)
+
+    # --- Placeholder for historical price/volume (실제 데이터 소스 필요) ---
+    # 향후 OHLCV 데이터로 교체 예정
+    dummy_prices = [100, 102, 105, 103, 104, 106, 108, 107, 109, 110]
+    dummy_volumes = [1000, 1200, 1100, 1300, 1250, 1400, 1500, 1600, 1550, 1650]
+    high_price = max(dummy_prices)
+    low_price = min(dummy_prices)
+
     table = []
     for sym in symbols:
         current_price = latest_prices.get(sym, None)
         if current_price:
-            buy_price = round(current_price * 0.97, 2)  # Anchored VWAP – 3% placeholder
+            # ✅ Anchored VWAP (최근 30일 데이터 가정)
+            avwap = calculate_anchored_vwap(dummy_prices, dummy_volumes)
+            # ✅ Fib Retracement
+            fib_price = calculate_fib_retracement(high_price, low_price)
+
+            # ✅ 혼합 추천가: AVWAP -3% 와 Fib 평균치
+            avwap_discount = avwap * 0.97 if avwap else current_price * 0.97
+            buy_price = round((avwap_discount + fib_price) / 2, 2)
+
             gap_rate = round(((current_price - buy_price) / buy_price) * 100, 2)
         else:
             buy_price = None
             gap_rate = None
 
         entry = {
-            "구분(분야)": SECTOR_MAP.get(sym, "").split("(")[-1].replace(")", ""),
             "종목": SECTOR_MAP.get(sym, sym),
+            "구분(분야)": SECTOR_MAP.get(sym, "").split("(")[-1].replace(")", ""),
             "현재가": current_price,
             "매수추천가": buy_price,
             "괴리율(%)": gap_rate,
