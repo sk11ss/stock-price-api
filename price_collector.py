@@ -1,4 +1,3 @@
-name: Daily Batch Collector
 
 on:
   schedule:
