@@ -54,7 +54,12 @@ CURRENT_HOLDINGS = {
 def get_latest_price(symbol):
     try:
         ticker = yf.Ticker(symbol)
-        return ticker.info.get("regularMarketPrice")
+        data = ticker.history(period="1d", interval="1m")
+        if not data.empty:
+            return round(data['Close'].iloc[-1], 2)
+        else:
+            print(f"⚠️ {symbol}: No price data found in history()")
+            return None
     except Exception as e:
         print(f"yfinance error for {symbol}: {e}")
         return None
