@@ -52,14 +52,45 @@ CURRENT_HOLDINGS = {
 }
 
 def get_latest_price(symbol):
+    """
+    ✅ 개선된 가격 조회:
+    - 장중: 1분봉 최신값
+    - 장후: 1일봉 종가
+    - 가격 검증: 전일 종가 대비 ±15% 이상 튀면 종가로 대체
+    """
     try:
         ticker = yf.Ticker(symbol)
-        data = ticker.history(period="1d", interval="1m")
-        if not data.empty:
-            return round(data['Close'].iloc[-1], 2)
-        else:
-            print(f"⚠️ {symbol}: No price data found in history()")
+
+        # 1) 전일 종가 가져오기 (검증용)
+        daily_data = ticker.history(period="5d", interval="1d")
+        if daily_data.empty:
+            print(f"⚠️ {symbol}: No daily data")
             return None
+        close_price = round(daily_data['Close'].iloc[-1], 2)
+
+        # 2) 1분봉 조회
+        intraday_data = ticker.history(period="1d", interval="1m")
+
+        if not intraday_data.empty:
+            last_price = round(intraday_data['Close'].iloc[-1], 2)
+        else:
+            last_price = close_price  # 1분봉 없으면 종가 사용
+
+        # 3) Sanity check (±15% 이상 튀면 무효 처리 후 종가 사용)
+        if last_price < close_price * 0.85 or last_price > close_price * 1.15:
+            print(f"⚠️ {symbol}: price anomaly detected (last={last_price}, close={close_price}) → fallback to close")
+            return close_price
+
+        # 4) 거래 시간 여부 확인
+        now_hour = time.gmtime().tm_hour
+        now_min = time.gmtime().tm_min
+        # 장중이 아닐 때 (한국시간 새벽 or 미국시간 장외) → 종가로 대체
+        # 미국 시장 기본 시간: 14:30~21:00 UTC
+        if not (14 <= now_hour <= 21):
+            return close_price
+
+        return last_price
+
     except Exception as e:
         print(f"yfinance error for {symbol}: {e}")
         return None
