@@ -4,7 +4,7 @@ import threading
 
 # 🔑 Alpaca API 정보
 API_KEY = "PKFLXCKJJFL57Y9L20TQ"
-SECRET_KEY = "qEUwb5wyLkgJswK0STlg2lisDX9TBVGD"
+SECRET_KEY = "qEUwb5wyLkgJswK0STlg2lisDX9TBVGDIOlHTpSc"
 BASE_URL = "https://paper-api.alpaca.markets"
 
 # 📊 무료 데이터 피드 (Paper 계정은 'iex'만 사용 가능)
