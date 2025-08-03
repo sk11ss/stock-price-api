@@ -185,7 +185,14 @@ def get_buy_table():
 
     table = []
     for sym in symbols:
-        current_price = latest_prices.get(sym, None)
+        # ✅ fallback: latest_prices 에 값이 없으면 실시간 스크래핑으로 채움
+        current_price = latest_prices.get(sym)
+        if current_price is None:
+            # ✅ 즉시 fallback: Investing.com 에서 가격 바로 긁어오기
+            current_price = get_latest_price(sym)
+            if current_price:
+                latest_prices[sym] = current_price
+
         if current_price:
             # ✅ Anchored VWAP (최근 30일 데이터 가정)
             avwap = calculate_anchored_vwap(dummy_prices, dummy_volumes)
