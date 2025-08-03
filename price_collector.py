@@ -5,10 +5,10 @@ import time
 symbols = ["MSFT", "VRT", "NVDA", "PWR", "GEV", "ORCL", "IONQ", "TSLA", "ASML", "AMD", "AVGO", "SMCI"]
 
 # ✅ 매수표 템플릿 (고정)
-# 1열: 종목, 2열: 구분(분야), 3열: 현재가, 4열: 매수추천가, 5열: 괴리율, 6열: 보유, 7열: 추가, 8열: 비중
+# 1열: 구분(분야), 2열: 종목, 3열: 현재가, 4열: 매수추천가, 5열: 괴리율, 6열: 보유, 7열: 추가, 8열: 비중
 BUY_TABLE_TEMPLATE = {
-    "columns": ["종목", "구분(분야)", "현재가", "매수추천가", "괴리율(%)", "보유", "추가", "비중"],
-    "description": "종목명은 예: MSFT (Azure/AI), 구분(분야)은 AI 섹터의 분야 표기, 보유/추가 주식수 포함"
+    "columns": ["구분(분야)", "종목", "현재가", "매수추천가", "괴리율(%)", "보유", "추가", "비중"],
+    "description": "구분(분야) → AI 섹터 분야, 종목명은 예: MSFT (Azure/AI)"
 }
 
 # ✅ 매수표 기본 구조 (데이터 예시 없이 템플릿만)
@@ -152,22 +152,26 @@ def get_external_price(symbol):
 # ✅ 매수표 생성 endpoint
 @app.route("/buytable")
 def get_buy_table():
+    equal_weight = round(100 / len(symbols), 1)
     table = []
     for sym in symbols:
         current_price = latest_prices.get(sym, None)
-        # Since EMA50 is not available, set buy_price and gap_rate to None
-        buy_price = None
-        gap_rate = None
+        if current_price:
+            buy_price = round(current_price * 0.97, 2)  # Anchored VWAP – 3% placeholder
+            gap_rate = round(((current_price - buy_price) / buy_price) * 100, 2)
+        else:
+            buy_price = None
+            gap_rate = None
 
         entry = {
-            "종목": SECTOR_MAP.get(sym, sym),
             "구분(분야)": SECTOR_MAP.get(sym, "").split("(")[-1].replace(")", ""),
+            "종목": SECTOR_MAP.get(sym, sym),
             "현재가": current_price,
             "매수추천가": buy_price,
             "괴리율(%)": gap_rate,
             "보유": CURRENT_HOLDINGS.get(sym, 0),
             "추가": 0,
-            "비중": "0%"
+            "비중": f"{equal_weight}%"
         }
         table.append(entry)
     return jsonify({"columns": BUY_TABLE_TEMPLATE["columns"], "data": table})
