@@ -1,4 +1,3 @@
-import yfinance as yf
 from flask import Flask, jsonify
 import threading
 import time
@@ -53,47 +52,10 @@ CURRENT_HOLDINGS = {
 
 def get_latest_price(symbol):
     """
-    ✅ 개선된 가격 조회:
-    - 장중: 1분봉 최신값
-    - 장후: 1일봉 종가
-    - 가격 검증: 전일 종가 대비 ±15% 이상 튀면 종가로 대체
+    ✅ (TEMP) yfinance 제거됨.
+    향후 Investing.com / TradingView 웹스크래핑으로 대체 예정.
     """
-    try:
-        ticker = yf.Ticker(symbol)
-
-        # 1) 전일 종가 가져오기 (검증용)
-        daily_data = ticker.history(period="5d", interval="1d")
-        if daily_data.empty:
-            print(f"⚠️ {symbol}: No daily data")
-            return None
-        close_price = round(daily_data['Close'].iloc[-1], 2)
-
-        # 2) 1분봉 조회
-        intraday_data = ticker.history(period="1d", interval="1m")
-
-        if not intraday_data.empty:
-            last_price = round(intraday_data['Close'].iloc[-1], 2)
-        else:
-            last_price = close_price  # 1분봉 없으면 종가 사용
-
-        # 3) Sanity check (±15% 이상 튀면 무효 처리 후 종가 사용)
-        if last_price < close_price * 0.85 or last_price > close_price * 1.15:
-            print(f"⚠️ {symbol}: price anomaly detected (last={last_price}, close={close_price}) → fallback to close")
-            return close_price
-
-        # 4) 거래 시간 여부 확인
-        now_hour = time.gmtime().tm_hour
-        now_min = time.gmtime().tm_min
-        # 장중이 아닐 때 (한국시간 새벽 or 미국시간 장외) → 종가로 대체
-        # 미국 시장 기본 시간: 14:30~21:00 UTC
-        if not (14 <= now_hour <= 21):
-            return close_price
-
-        return last_price
-
-    except Exception as e:
-        print(f"yfinance error for {symbol}: {e}")
-        return None
+    return "use_web_scraping_only"
 
 latest_prices = {}
 
@@ -112,6 +74,10 @@ def collect_prices():
 
 app = Flask(__name__)
 
+# For external price validation placeholder for web scraping
+import requests
+from bs4 import BeautifulSoup
+
 @app.route("/price/<symbol>")
 def get_price(symbol):
     price = latest_prices.get(symbol.upper())
@@ -122,7 +88,7 @@ def get_price(symbol):
 
 @app.route("/price/realtime/<symbol>")
 def get_price_realtime(symbol):
-    # Yahoo Finance에서 즉시 가격 조회
+    # 웹스크래핑 기반 즉시 가격 조회 예정
     price = get_latest_price(symbol.upper())
     if price:
         return jsonify({"symbol": symbol.upper(), "price": price, "source": "realtime"})
@@ -130,49 +96,39 @@ def get_price_realtime(symbol):
         return jsonify({"error": "Realtime price unavailable"}), 404
 
 
-# EMA50 endpoint
-@app.route("/ema50/<symbol>")
-def get_ema50(symbol):
-    symbol = symbol.upper()
+# TODO: EMA50 endpoint to be rebuilt with scraped historical data or alternate API
+# @app.route("/ema50/<symbol>")
+# def get_ema50(symbol):
+#     return jsonify({"error": "EMA50 calculation not implemented"}), 501
+
+# TODO: Batch prices endpoint to be rebuilt with web scraping
+# @app.route("/batch/prices")
+# def batch_prices():
+#     return jsonify({"error": "Batch prices not implemented"}), 501
+
+# TODO: Batch EMA50 endpoint to be rebuilt with web scraping
+# @app.route("/batch/ema50")
+# def batch_ema50():
+#     return jsonify({"error": "Batch EMA50 not implemented"}), 501
+
+# ✅ 외부 소스 기반 가격 조회 endpoint (웹스크래핑 기반)
+@app.route("/external_price/<symbol>")
+def get_external_price(symbol):
+    """
+    ✅ 외부 소스(웹스크래핑) 기반 가격 조회
+    - yfinance 제거됨
+    - 추후 BeautifulSoup 스크래핑 로직 추가 예정
+    """
     try:
-        data = yf.download(symbol, period="6mo", interval="1d")
-        if not data.empty:
-            ema50 = data['Close'].ewm(span=50, adjust=False).mean().iloc[-1]
-            return jsonify({"symbol": symbol, "ema50": round(ema50, 2)})
-        else:
-            return jsonify({"error": "No data for EMA50"}), 404
+        sym = symbol.upper()
+        # Placeholder response
+        return jsonify({
+            "symbol": sym,
+            "price": None,
+            "source": "web scraping (to be implemented)"
+        })
     except Exception as e:
-        return jsonify({"error": f"EMA50 calculation failed: {e}"}), 500
-
-
-# Batch prices endpoint
-@app.route("/batch/prices")
-def batch_prices():
-    results = {}
-    for sym in symbols:
-        try:
-            ticker = yf.Ticker(sym)
-            price = ticker.info.get("regularMarketPrice")
-            results[sym] = round(price, 2) if price else None
-        except Exception as e:
-            results[sym] = None
-    return jsonify(results)
-
-# Batch EMA50 endpoint
-@app.route("/batch/ema50")
-def batch_ema50():
-    results = {}
-    for sym in symbols:
-        try:
-            data = yf.download(sym, period="6mo", interval="1d")
-            if not data.empty:
-                ema50 = data['Close'].ewm(span=50, adjust=False).mean().iloc[-1]
-                results[sym] = round(ema50, 2)
-            else:
-                results[sym] = None
-        except Exception as e:
-            results[sym] = None
-    return jsonify(results)
+        return jsonify({"error": f"External price lookup failed: {e}"}), 500
 
 # ✅ 매수표 생성 endpoint
 @app.route("/buytable")
@@ -180,18 +136,9 @@ def get_buy_table():
     table = []
     for sym in symbols:
         current_price = latest_prices.get(sym, None)
-        ema50 = None
+        # Since EMA50 is not available, set buy_price and gap_rate to None
         buy_price = None
         gap_rate = None
-        try:
-            data = yf.download(sym, period="6mo", interval="1d")
-            if not data.empty:
-                ema50 = data['Close'].ewm(span=50, adjust=False).mean().iloc[-1]
-                buy_price = round(ema50 * 0.97, 2)
-                if current_price:
-                    gap_rate = round(((buy_price - current_price) / current_price) * 100, 2)
-        except Exception as e:
-            ema50 = None
 
         entry = {
             "종목": SECTOR_MAP.get(sym, sym),
@@ -207,7 +154,7 @@ def get_buy_table():
     return jsonify({"columns": BUY_TABLE_TEMPLATE["columns"], "data": table})
 
 if __name__ == "__main__":
-    print("⏳ 1분 단위 가격 수집 + Flask API 시작")
+    print("⏳ 1분 단위 가격 수집 + Flask API 시작 (가격 데이터는 웹스크래핑으로 대체 예정)")
     t = threading.Thread(target=collect_prices, daemon=True)
     t.start()
     import os
