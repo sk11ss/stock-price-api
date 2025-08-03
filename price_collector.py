@@ -1,28 +1,11 @@
 import yfinance as yf
 from flask import Flask, jsonify
 import threading
-import requests
 import time
-
-API_KEY = "PKFLXCKJJFL57Y9L20TQ"
-SECRET_KEY = "qEUwb5wyLkgJswK0STlg2lisDX9TBVGDIOlHTpSc"
 
 symbols = ["MSFT", "VRT", "NVDA", "PWR", "GEV", "ORCL", "IONQ", "TSLA", "ASML", "AMD", "AVGO"]
 
-headers = {
-    "APCA-API-KEY-ID": API_KEY,
-    "APCA-API-SECRET-KEY": SECRET_KEY
-}
-
 def get_latest_price(symbol):
-    url = f"https://data.alpaca.markets/v2/stocks/{symbol}/quotes/latest"
-    r = requests.get(url, headers=headers)
-    if r.status_code == 200:
-        data = r.json()
-        price = data.get("quote", {}).get("ap")  # ask price
-        if price:
-            return price
-    # fallback to yfinance
     try:
         ticker = yf.Ticker(symbol)
         return ticker.info.get("regularMarketPrice")
@@ -57,38 +40,12 @@ def get_price(symbol):
 
 @app.route("/price/realtime/<symbol>")
 def get_price_realtime(symbol):
-    # Alpaca API에서 즉시 가격 조회
+    # Yahoo Finance에서 즉시 가격 조회
     price = get_latest_price(symbol.upper())
     if price:
         return jsonify({"symbol": symbol.upper(), "price": price, "source": "realtime"})
     else:
         return jsonify({"error": "Realtime price unavailable"}), 404
-
-
-# 가격 비교 엔드포인트: Alpaca vs Yahoo
-@app.route("/price/compare/<symbol>")
-def compare_prices(symbol):
-    symbol = symbol.upper()
-    # Alpaca 가격 조회
-    alpaca_url = f"https://data.alpaca.markets/v2/stocks/{symbol}/quotes/latest"
-    r = requests.get(alpaca_url, headers=headers)
-    alpaca_price = None
-    if r.status_code == 200:
-        data = r.json()
-        alpaca_price = data.get("quote", {}).get("ap")
-    # Yahoo 가격 조회
-    yahoo_price = None
-    try:
-        ticker = yf.Ticker(symbol)
-        yahoo_price = ticker.info.get("regularMarketPrice")
-    except Exception as e:
-        print(f"Yahoo error for {symbol}: {e}")
-    # JSON 응답 구성
-    return jsonify({
-        "symbol": symbol,
-        "alpaca": alpaca_price,
-        "yahoo": yahoo_price
-    })
 
 if __name__ == "__main__":
     print("⏳ 1분 단위 가격 수집 + Flask API 시작")
