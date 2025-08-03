@@ -50,12 +50,34 @@ CURRENT_HOLDINGS = {
     "TSLA": 0
 }
 
+# For external price validation placeholder for web scraping
+import requests
+from bs4 import BeautifulSoup
+
+HEADERS = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15"}
+
 def get_latest_price(symbol):
     """
-    ✅ (TEMP) yfinance 제거됨.
-    향후 Investing.com / TradingView 웹스크래핑으로 대체 예정.
+    ✅ Investing.com 웹스크래핑 기반 가격 조회
     """
-    return "use_web_scraping_only"
+    try:
+        url = f"https://www.investing.com/equities/{symbol.lower()}"
+        res = requests.get(url, headers=HEADERS, timeout=10)
+        if res.status_code != 200:
+            print(f"⚠️ {symbol}: HTTP {res.status_code} 에러")
+            return None
+        soup = BeautifulSoup(res.text, "html.parser")
+        # ✅ Investing.com 가격 CSS selector (동적으로 업데이트 가능)
+        price_tag = soup.select_one("div.text-5xl span") or soup.select_one("span.instrument-price_last__KQzyA")
+        if price_tag:
+            price_text = price_tag.text.replace(",", "").strip()
+            return float(price_text)
+        else:
+            print(f"⚠️ {symbol}: 가격 태그를 찾을 수 없음")
+            return None
+    except Exception as e:
+        print(f"❌ {symbol} 웹스크래핑 에러: {e}")
+        return None
 
 latest_prices = {}
 
@@ -73,10 +95,6 @@ def collect_prices():
         time.sleep(60)
 
 app = Flask(__name__)
-
-# For external price validation placeholder for web scraping
-import requests
-from bs4 import BeautifulSoup
 
 @app.route("/price/<symbol>")
 def get_price(symbol):
@@ -115,18 +133,19 @@ def get_price_realtime(symbol):
 @app.route("/external_price/<symbol>")
 def get_external_price(symbol):
     """
-    ✅ 외부 소스(웹스크래핑) 기반 가격 조회
-    - yfinance 제거됨
-    - 추후 BeautifulSoup 스크래핑 로직 추가 예정
+    ✅ Investing.com 웹스크래핑 기반 가격 조회
     """
     try:
         sym = symbol.upper()
-        # Placeholder response
-        return jsonify({
-            "symbol": sym,
-            "price": None,
-            "source": "web scraping (to be implemented)"
-        })
+        scraped_price = get_latest_price(sym)
+        if scraped_price:
+            return jsonify({
+                "symbol": sym,
+                "price": scraped_price,
+                "source": "Investing.com scraping"
+            })
+        else:
+            return jsonify({"error": f"{sym} price not found"}), 404
     except Exception as e:
         return jsonify({"error": f"External price lookup failed: {e}"}), 500
 
