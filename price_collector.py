@@ -143,15 +143,29 @@ def batch_ema50():
 def get_buy_table():
     table = []
     for sym in symbols:
+        current_price = latest_prices.get(sym, None)
+        ema50 = None
+        buy_price = None
+        gap_rate = None
+        try:
+            data = yf.download(sym, period="6mo", interval="1d")
+            if not data.empty:
+                ema50 = data['Close'].ewm(span=50, adjust=False).mean().iloc[-1]
+                buy_price = round(ema50 * 0.97, 2)
+                if current_price:
+                    gap_rate = round(((buy_price - current_price) / current_price) * 100, 2)
+        except Exception as e:
+            ema50 = None
+
         entry = {
             "종목": SECTOR_MAP.get(sym, sym),
             "구분(분야)": SECTOR_MAP.get(sym, "").split("(")[-1].replace(")", ""),
-            "현재가": latest_prices.get(sym, None),
-            "매수추천가": None,  # 나중에 로직 추가
-            "괴리율(%)": None,    # 나중에 계산 추가
+            "현재가": current_price,
+            "매수추천가": buy_price,
+            "괴리율(%)": gap_rate,
             "보유": CURRENT_HOLDINGS.get(sym, 0),
-            "추가": 0,  # 나중에 계산 추가
-            "비중": "0%"  # 나중에 계산 추가
+            "추가": 0,
+            "비중": "0%"
         }
         table.append(entry)
     return jsonify({"columns": BUY_TABLE_TEMPLATE["columns"], "data": table})
