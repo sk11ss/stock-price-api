@@ -1,3 +1,4 @@
+import yfinance as yf
 from flask import Flask, jsonify
 import threading
 import requests
@@ -18,8 +19,15 @@ def get_latest_price(symbol):
     r = requests.get(url, headers=headers)
     if r.status_code == 200:
         data = r.json()
-        return data.get("quote", {}).get("ap")  # ask price 사용
-    else:
+        price = data.get("quote", {}).get("ap")  # ask price
+        if price:
+            return price
+    # fallback to yfinance
+    try:
+        ticker = yf.Ticker(symbol)
+        return ticker.info.get("regularMarketPrice")
+    except Exception as e:
+        print(f"yfinance error for {symbol}: {e}")
         return None
 
 latest_prices = {}
