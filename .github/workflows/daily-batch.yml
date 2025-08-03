@@ -22,9 +22,9 @@ jobs:
         run: |
           pip install -r requirements.txt
 
-      - name: Run batch_collector.py
+      - name: Run price_collector.py
         run: |
-          python batch_collector.py
+          python price_collector.py
 
       - name: Commit & push generated JSON
         run: |
