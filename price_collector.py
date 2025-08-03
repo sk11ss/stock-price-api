@@ -47,6 +47,21 @@ def get_price_realtime(symbol):
     else:
         return jsonify({"error": "Realtime price unavailable"}), 404
 
+
+# EMA50 endpoint
+@app.route("/ema50/<symbol>")
+def get_ema50(symbol):
+    symbol = symbol.upper()
+    try:
+        data = yf.download(symbol, period="6mo", interval="1d")
+        if not data.empty:
+            ema50 = data['Close'].ewm(span=50, adjust=False).mean().iloc[-1]
+            return jsonify({"symbol": symbol, "ema50": round(ema50, 2)})
+        else:
+            return jsonify({"error": "No data for EMA50"}), 404
+    except Exception as e:
+        return jsonify({"error": f"EMA50 calculation failed: {e}"}), 500
+
 if __name__ == "__main__":
     print("⏳ 1분 단위 가격 수집 + Flask API 시작")
     t = threading.Thread(target=collect_prices, daemon=True)
