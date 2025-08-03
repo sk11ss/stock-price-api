@@ -47,6 +47,15 @@ def get_price(symbol):
     else:
         return jsonify({"error": "No data yet"}), 404
 
+@app.route("/price/realtime/<symbol>")
+def get_price_realtime(symbol):
+    # Alpaca API에서 즉시 가격 조회
+    price = get_latest_price(symbol.upper())
+    if price:
+        return jsonify({"symbol": symbol.upper(), "price": price, "source": "realtime"})
+    else:
+        return jsonify({"error": "Realtime price unavailable"}), 404
+
 if __name__ == "__main__":
     print("⏳ 1분 단위 가격 수집 + Flask API 시작")
     t = threading.Thread(target=collect_prices, daemon=True)
