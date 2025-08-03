@@ -6,7 +6,7 @@ import time
 API_KEY = "PKFLXCKJJFL57Y9L20TQ"
 SECRET_KEY = "qEUwb5wyLkgJswK0STlg2lisDX9TBVGDIOlHTpSc"
 
-symbols = ["MSFT", "VRT", "NVDA", "PWR", "GEV", "ORCL", "HOOD", "IONQ", "TSLA"]
+symbols = ["MSFT", "VRT", "NVDA", "PWR", "GEV", "ORCL", "IONQ", "TSLA", "ASML", "AMD", "AVGO"]
 
 headers = {
     "APCA-API-KEY-ID": API_KEY,
