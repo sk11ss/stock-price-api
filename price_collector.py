@@ -1,63 +1,35 @@
-import requests
-from bs4 import BeautifulSoup
-import json
-import datetime
-import numpy as np
-import os
+name: Daily Batch Collector
 
-HEADERS = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15"}
+on:
+  schedule:
+    - cron: '0 19 * * *'   # 매일 UTC 19:00 실행 (한국시간 새벽 4시)
+  workflow_dispatch:        # 필요시 수동 실행도 가능
 
-symbols = ["MSFT", "VRT", "NVDA", "PWR", "GEV", "ORCL", "IONQ", "TSLA", "ASML", "AMD", "AVGO", "SMCI"]
+jobs:
+  run-batch:
+    runs-on: ubuntu-latest
 
-def scrape_ohlcv(symbol):
-    """
-    ✅ Placeholder for OHLCV scraping – 
-    Investing.com에서 30일 OHLCV를 가져오는 자리.
-    현재는 dummy data (실제 HTML 파싱 로직 추가 예정).
-    """
-    dummy_prices = [100, 102, 105, 103, 104, 106, 108, 107, 109, 110] * 3  # 30 days
-    dummy_volumes = [1000, 1200, 1100, 1300, 1250, 1400, 1500, 1600, 1550, 1650] * 3
-    return dummy_prices, dummy_volumes
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
 
-def calculate_anchored_vwap(prices, volumes):
-    if not prices or not volumes or len(prices) != len(volumes):
-        return None
-    return round(np.dot(prices, volumes) / np.sum(volumes), 2)
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
 
-def calculate_fib_retracement(high, low):
-    fib_50 = low + (high - low) * 0.5
-    fib_618 = low + (high - low) * 0.618
-    return round((fib_50 + fib_618) / 2, 2)
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
 
-def main():
-    today = datetime.date.today().strftime("%Y-%m-%d")
-    output_file = f"daily_buytable_{today}.json"
+      - name: Run batch_collector.py
+        run: |
+          python batch_collector.py
 
-    table = []
-    for sym in symbols:
-        prices, volumes = scrape_ohlcv(sym)
-        high_price = max(prices)
-        low_price = min(prices)
-
-        avwap = calculate_anchored_vwap(prices, volumes)
-        fib_price = calculate_fib_retracement(high_price, low_price)
-
-        avwap_discount = avwap * 0.97 if avwap else None
-        buy_price = round((avwap_discount + fib_price) / 2, 2) if avwap_discount and fib_price else None
-
-        entry = {
-            "symbol": sym,
-            "avwap": avwap,
-            "fib_price": fib_price,
-            "buy_price": buy_price,
-            "calculation_date": today
-        }
-        table.append(entry)
-
-    with open(output_file, "w") as f:
-        json.dump({"date": today, "data": table}, f, indent=2, ensure_ascii=False)
-
-    print(f"✅ Batch completed → {output_file} 생성됨")
-
-if __name__ == "__main__":
-    main()
+      - name: Commit & push generated JSON
+        run: |
+          git config --global user.name 'github-actions'
+          git config --global user.email 'actions@github.com'
+          git add daily_buytable_*.json
+          git commit -m "📊 Daily buytable update" || echo "No changes to commit"
+          git push
