@@ -62,6 +62,36 @@ def get_ema50(symbol):
     except Exception as e:
         return jsonify({"error": f"EMA50 calculation failed: {e}"}), 500
 
+
+# Batch prices endpoint
+@app.route("/batch/prices")
+def batch_prices():
+    results = {}
+    for sym in symbols:
+        try:
+            ticker = yf.Ticker(sym)
+            price = ticker.info.get("regularMarketPrice")
+            results[sym] = round(price, 2) if price else None
+        except Exception as e:
+            results[sym] = None
+    return jsonify(results)
+
+# Batch EMA50 endpoint
+@app.route("/batch/ema50")
+def batch_ema50():
+    results = {}
+    for sym in symbols:
+        try:
+            data = yf.download(sym, period="6mo", interval="1d")
+            if not data.empty:
+                ema50 = data['Close'].ewm(span=50, adjust=False).mean().iloc[-1]
+                results[sym] = round(ema50, 2)
+            else:
+                results[sym] = None
+        except Exception as e:
+            results[sym] = None
+    return jsonify(results)
+
 if __name__ == "__main__":
     print("⏳ 1분 단위 가격 수집 + Flask API 시작")
     t = threading.Thread(target=collect_prices, daemon=True)
